@@ -8,10 +8,29 @@
 | `index.html` | 화면 + 통화(PeerJS) + 음성인식(Vosk) + 경고 |
 | `detector.js` | 키워드 탐지 로직 (CSV 읽기, 점수 계산, 자막 강조) |
 | `ringtone.mp3` | 전화 수신 벨소리 |
-| `make_model.sh` | 한국어 음성인식 모델을 웹용 파일로 만드는 스크립트 |
+| `cloudflare-worker/worker.js` | 고정확도 인식 서버 (Cloudflare Worker에 붙여넣기) |
+| `make_model.sh` | 온디바이스 음성인식 모델을 웹용 파일로 만드는 스크립트 |
 | `models/` | 만든 모델 파일이 들어가는 곳 (직접 생성) |
 
-## 1. 음성인식 모델 준비 (처음 한 번)
+## 0. 고정확도 인식 서버 만들기 (추천, 처음 한 번)
+억양이 있거나 전화 음질인 음성은 온디바이스 모델로는 거의 못 알아듣습니다. 구글의 실시간 받아쓰기 전용 모델(`gemini-3.5-transcribe-live`)을 쓰면 훨씬 정확합니다. API 키를 웹페이지에 넣으면 누구나 훔쳐 쓸 수 있으므로, Cloudflare Worker가 키를 숨긴 채 중계합니다.
+
+1. **API 키 발급**: aistudio.google.com → Get API key → 키 복사
+2. **Worker 만들기**: Cloudflare 대시보드 → Workers & Pages → 만들기 → Worker → 이름 `voiceguard-stt` → 배포
+3. **코드 넣기**: 코드 편집 → 기존 내용을 지우고 `cloudflare-worker/worker.js` 내용을 붙여넣기 → 배포
+4. **변수 설정**: Worker → 설정 → 변수 및 비밀
+   - `GEMINI_API_KEY` (유형: 비밀) = 1에서 복사한 키
+   - `ALLOWED_ORIGINS` (유형: 텍스트) = `https://아이디.github.io,http://localhost:8080`
+     → 내 사이트에서만 쓸 수 있게 막는 설정입니다. 주소 끝에 `/voiceguard` 같은 경로는 붙이지 않습니다.
+5. Worker 주소(`https://voiceguard-stt.○○.workers.dev`)를 주소창에 열어 `ok`와 `API 키 설정됨`이 보이면 성공
+6. 앱 **설정 → 음성인식 엔진 → Gemini 고정확도** → 서버 주소 붙여넣기 → **저장** → **연결 테스트**
+
+참고
+- 요금은 대략 통화 1분에 1센트 안팎이고(양쪽이 모두 인식하므로 그 2배), 무료 등급에서 안 되면 AI Studio에서 결제 설정이 필요할 수 있습니다.
+- 키워드 목록(상위 100개)을 어휘 힌트로 함께 보내 그 단어들을 더 잘 알아듣게 합니다.
+- 고정확도 엔진을 쓰면 통화 음성이 Worker와 구글 서버를 거칩니다. 아래 1번(온디바이스 모델)은 필요 없습니다.
+
+## 1. 온디바이스 음성인식 모델 준비 (선택)
 맥 터미널에서 이 폴더로 이동한 뒤:
 ```bash
 bash make_model.sh

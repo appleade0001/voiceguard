@@ -242,6 +242,27 @@
         </div>
 
         <div class="group">
+          <h2>음성인식 엔진</h2>
+          <div class="row2" style="margin-top:0" id="engines">
+            <button class="btn" data-engine="gemini">Gemini 고정확도</button>
+            <button class="btn" data-engine="vosk">온디바이스</button>
+          </div>
+          <p id="engineDesc"></p>
+          <div id="geminiBox">
+            <div class="modelLine" style="margin-top:12px"><span class="dot" id="proxyDot"></span><span id="proxyText">서버 주소 없음</span></div>
+            <div class="field"><label for="setProxy">인식 서버 주소 (Cloudflare Worker)</label><input type="text" id="setProxy" placeholder="https://voiceguard-stt.아이디.workers.dev" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+            <div class="row2"><button class="btn blue" id="btnProxySave">저장</button><button class="btn" id="btnProxyTest">연결 테스트</button></div>
+            <p id="proxyMsg"></p>
+          </div>
+          <div id="voskBox">
+            <div class="modelLine" style="margin-top:12px"><span class="dot" id="modelDot"></span><span id="modelText">대기 중</span></div>
+            <div class="field"><label for="setModel">모델 주소</label><input type="text" id="setModel"></div>
+            <div class="row2"><button class="btn" id="btnModelReload">다시 불러오기</button><button class="btn" id="btnModelClear">캐시 지우고 다시 받기</button></div>
+            <p id="modelMsg"></p>
+          </div>
+        </div>
+
+        <div class="group">
           <h2>통화 화면 테마</h2>
           <div class="themes" id="themes">
             <button class="theme" data-theme="real"><div class="mini"><div class="n"></div><div class="c"></div><div class="b"><span></span><span></span><span></span><span></span><span></span><span></span></div></div>실제 전화</button>
@@ -267,14 +288,6 @@
           <textarea id="kwText" style="margin-top:10px" spellcheck="false"></textarea>
           <div class="row2"><button class="btn blue" id="btnApply">적용</button><button class="btn" id="btnReset">기본값</button></div>
           <p id="kwInfo"></p>
-        </div>
-
-        <div class="group">
-          <h2>음성인식 모델</h2>
-          <div class="modelLine"><span class="dot" id="modelDot"></span><span id="modelText">대기 중</span></div>
-          <div class="field"><label for="setModel">모델 주소</label><input type="text" id="setModel"></div>
-          <div class="row2"><button class="btn" id="btnModelReload">다시 불러오기</button><button class="btn" id="btnModelClear">캐시 지우고 다시 받기</button></div>
-          <p id="modelMsg"></p>
         </div>
 
         <div class="group">
@@ -402,7 +415,7 @@
 /* ================= 설정 ================= */
 const ID_PREFIX = 'voiceguard-sichs-';   // 다른 PeerJS 사용자와 번호가 겹치지 않게 하는 접두어
 const NUM_LEN = 11;
-const DEFAULTS = { suspect: 3, danger: 6, windowSec: 120, modelUrl: 'models/vosk-model-small-ko-0.22.tar.gz', theme: 'caption', myName: '' };
+const DEFAULTS = { suspect: 3, danger: 6, windowSec: 120, modelUrl: 'models/vosk-model-small-ko-0.22.tar.gz', theme: 'caption', myName: '', engine: 'gemini', proxyUrl: '' };
 const store = {
   get(k, d) { try { const v = localStorage.getItem('vg_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem('vg_' + k, JSON.stringify(v)); } catch (e) {} },
@@ -426,7 +439,7 @@ const $ = (id) => document.getElementById(id);
 const S = {
   ctx: null, mic: null, micGain: null, outDest: null, fileEl: null, fileUrl: null,
   peer: null, myId: null, call: null, pendingCall: null, pendingInfo: null, info: null, remoteStream: null,
-  model: null, modelState: 'idle', recog: null, solo: false, netOk: false,
+  model: null, modelState: 'idle', proxyState: 'idle', recog: null, solo: false, netOk: false,
   detector: null, alertLevel: 0, maxLevel: 0, hitCount: 0, log: [],
   viewTheme: cfg.theme, dial: '', dtmf: '', muted: false,
   callStart: 0, connected: false, timerId: null, ringbackId: null, vibrateId: null, ending: false,
@@ -662,10 +675,11 @@ function setModelStatus(text, cls, msg) {
   if (msg !== undefined) $('modelMsg').textContent = msg;
   updateStatusDot();
 }
+function sttReady() { return effEngine() === 'gemini' ? true : S.modelState === 'ready'; }
 function updateStatusDot() {
-  const bad = !S.netOk || S.modelState === 'error';
-  const ok = S.netOk && S.modelState === 'ready';
-  $('statusDot').className = 'dot' + (ok ? ' ok' : bad && S.myId ? ' bad' : '');
+  const sttBad = effEngine() === 'vosk' ? S.modelState === 'error' : S.proxyState === 'error';
+  const ok = S.netOk && sttReady() && !sttBad;
+  $('statusDot').className = 'dot' + (ok ? ' ok' : (!S.netOk || sttBad) && S.myId ? ' bad' : '');
 }
 async function checkModelUrl(url) {
   if (location.protocol === 'file:')
@@ -723,8 +737,10 @@ async function loadModel() {
     S.modelState = 'ready';
     setModelStatus('음성인식 준비됨', 'ok', `준비 완료 (${Math.round((Date.now() - t0) / 1000)}초). 다음부터는 저장된 모델을 바로 씁니다.`);
     toast('음성인식 준비 완료');
-    if (S.remoteStream && !S.recog) startRecognition(S.remoteStream);
-    else if (S.solo && !S.recog) startRecognition(S.mic);
+    if (effEngine() === 'vosk') {
+      if (S.remoteStream && !S.recog) startRecognition(S.remoteStream);
+      else if (S.solo && !S.recog) startRecognition(S.mic);
+    }
   } catch (e) {
     console.error(e);
     S.modelState = 'error';
@@ -741,6 +757,7 @@ $('btnModelClear').onclick = async () => {
 
 function startRecognition(stream) {
   stopRecognition();
+  if (effEngine() === 'gemini') { startGemini(stream); return; }
   if (S.modelState !== 'ready') {
     addCap(S.modelState === 'loading' ? '음성인식 모델을 불러오는 중입니다. 준비되면 자동으로 자막이 시작됩니다.' : '음성인식 모델이 없어 자막 없이 통화만 됩니다. (설정 → 음성인식 모델 확인)', true);
     return;
@@ -754,22 +771,178 @@ function startRecognition(stream) {
   proc.onaudioprocess = (ev) => {
     const buf = ev.inputBuffer;
     try { rec.acceptWaveform(buf); } catch (e) {}
-    const d = buf.getChannelData(0); let sum = 0;
-    for (let i = 0; i < d.length; i += 16) sum += d[i] * d[i];
-    $('meter').style.width = Math.min(100, Math.sqrt(sum / (d.length / 16)) * 400) + '%';
+    showMeter(buf.getChannelData(0));
   };
   src.connect(proc); proc.connect(sink); sink.connect(S.ctx.destination);
-  S.recog = { rec, src, proc, sink };
+  S.recog = { kind: 'vosk', stop() {
+    try { rec.retrieveFinalResult(); } catch (e) {}
+    setTimeout(() => { try { rec.remove(); } catch (e) {} }, 800);
+    proc.onaudioprocess = null;
+    try { src.disconnect(); proc.disconnect(); sink.disconnect(); } catch (e) {}
+  } };
 }
 function stopRecognition() {
   if (!S.recog) return;
-  const { rec, src, proc, sink } = S.recog;
-  try { rec.retrieveFinalResult(); } catch (e) {}
-  setTimeout(() => { try { rec.remove(); } catch (e) {} }, 800);
-  proc.onaudioprocess = null;
-  try { src.disconnect(); proc.disconnect(); sink.disconnect(); } catch (e) {}
-  S.recog = null; $('meter').style.width = '0';
+  const r = S.recog; S.recog = null;
+  try { r.stop(); } catch (e) {}
+  $('meter').style.width = '0';
 }
+function showMeter(d) {
+  let sum = 0;
+  for (let i = 0; i < d.length; i += 16) sum += d[i] * d[i];
+  $('meter').style.width = Math.min(100, Math.sqrt(sum / (d.length / 16)) * 400) + '%';
+}
+
+/* ================= 고정확도 인식 (Gemini 실시간 전사, Cloudflare Worker 경유) ================= */
+const GEMINI_MODEL = 'models/gemini-3.5-transcribe-live';
+function effEngine() { return cfg.engine === 'gemini' && cfg.proxyUrl ? 'gemini' : 'vosk'; }
+function wsUrl(u) { return u.trim().replace(/\/+$/, '').replace(/^http(s?):\/\//, 'ws$1://'); }
+function geminiSetup(autoLang) {
+  // 보이스피싱 키워드를 어휘 힌트로 넘겨 그 단어들을 더 잘 알아듣게 함 (최대 100개 권장)
+  const vocab = [...new Set(VG.parseCsv(cfg.csv).sort((a, b) => b.weight - a.weight).map((k) => k.word))].slice(0, 100);
+  return { setup: {
+    model: GEMINI_MODEL,
+    generationConfig: { responseModalities: ['TEXT'] },
+    inputAudioTranscription: { languageCodes: autoLang ? [] : ['ko-KR'], customVocabulary: vocab, mode: 'VERBATIM' },
+  } };
+}
+async function wsText(data) {
+  if (typeof data === 'string') return data;
+  if (data instanceof Blob) return await data.text();
+  return new TextDecoder().decode(data);
+}
+function b64(u8) {
+  let s = '';
+  for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+const CHUNK = 1600;   // 16kHz에서 100ms
+function startGemini(stream) {
+  const R = { kind: 'gemini', active: true, ws: null, ready: false, fails: 0, announced: false,
+    carry: new Float32Array(0), pending: new Int16Array(0) };
+  const ratio = S.ctx.sampleRate / 16000;
+  const src = S.ctx.createMediaStreamSource(stream);
+  const proc = S.ctx.createScriptProcessor(4096, 1, 1);
+  const sink = S.ctx.createGain(); sink.gain.value = 0;
+  proc.onaudioprocess = (ev) => {
+    const d = ev.inputBuffer.getChannelData(0);
+    showMeter(d);
+    // 48kHz → 16kHz 16비트 PCM (구간 평균으로 줄여 잡음 접힘 감소)
+    const all = new Float32Array(R.carry.length + d.length); all.set(R.carry); all.set(d, R.carry.length);
+    const n = Math.floor(all.length / ratio);
+    const pcm = new Int16Array(n);
+    for (let i = 0; i < n; i++) {
+      const a = Math.floor(i * ratio), b = Math.max(a + 1, Math.floor((i + 1) * ratio));
+      let sum = 0; for (let j = a; j < b; j++) sum += all[j];
+      const v = Math.max(-1, Math.min(1, sum / (b - a)));
+      pcm[i] = v < 0 ? v * 0x8000 : v * 0x7fff;
+    }
+    R.carry = all.slice(Math.floor(n * ratio));
+    const merged = new Int16Array(R.pending.length + pcm.length); merged.set(R.pending); merged.set(pcm, R.pending.length);
+    R.pending = merged.length > 16000 * 5 ? merged.slice(merged.length - 16000 * 5) : merged;   // 연결 전에는 최근 5초만 보관
+    flush();
+  };
+  function flush() {
+    if (!R.ready || !R.ws || R.ws.readyState !== 1) return;
+    let off = 0;
+    while (R.pending.length - off >= CHUNK) {
+      const part = R.pending.subarray(off, off + CHUNK);
+      R.ws.send(JSON.stringify({ realtimeInput: { audio: { data: b64(new Uint8Array(part.buffer, part.byteOffset, part.byteLength)), mimeType: 'audio/pcm;rate=16000' } } }));
+      off += CHUNK;
+    }
+    R.pending = R.pending.slice(off);
+  }
+  function connect() {
+    if (!R.active) return;
+    let ws;
+    try { ws = new WebSocket(wsUrl(cfg.proxyUrl)); } catch (e) { addCap('인식 서버 주소가 올바르지 않습니다. 설정 → 음성인식 엔진을 확인하세요.', true); return; }
+    R.ws = ws; R.ready = false;
+    ws.onopen = () => ws.send(JSON.stringify(geminiSetup(R.autoLang)));
+    ws.onmessage = async (ev) => {
+      let m; try { m = JSON.parse(await wsText(ev.data)); } catch (e) { return; }
+      if (R.ws !== ws) return;
+      if (m.setupComplete) {
+        R.ready = true; R.fails = 0; setProxyState('ok');
+        if (!R.announced) { R.announced = true; addCap('고정확도 인식(Gemini) 작동 중', true); }
+        flush();
+      }
+      const sc = m.serverContent;
+      if (sc && sc.interimInputTranscription) $('capPartial').textContent = sc.interimInputTranscription.text || '';
+      if (sc && sc.inputTranscription && sc.inputTranscription.text) { $('capPartial').textContent = ''; onFinalText(sc.inputTranscription.text); }
+      if (m.goAway) reconnect();   // 세션 시간 제한(약 10분) 전에 새로 연결
+      if (m.error) addCap('인식 서버 오류: ' + esc(m.error.message || JSON.stringify(m.error)), true);
+    };
+    ws.onclose = (ev) => {
+      if (R.ws !== ws || !R.active) return;
+      R.ready = false; R.fails++;
+      if (ev.code === 1007 && !R.autoLang) R.autoLang = true;   // 언어 코드를 거부하면 자동 감지로 재시도
+      if (R.fails > 4) {
+        R.active = false; setProxyState('error', `연결 실패 (${ev.code}${ev.reason ? ' ' + ev.reason : ''})`);
+        addCap(`고정확도 인식 연결 실패 (${ev.code}${ev.reason ? ' · ' + esc(ev.reason) : ''}). 설정 → 음성인식 엔진에서 서버 주소와 API 키를 확인하세요.`, true);
+        return;
+      }
+      if (ev.reason) addCap(`인식 서버 연결이 끊겨 다시 연결합니다 (${esc(ev.reason)})`, true);
+      setTimeout(connect, 700 * R.fails);
+    };
+  }
+  function reconnect() { const old = R.ws; R.ws = null; R.ready = false; try { old.close(); } catch (e) {} connect(); }
+  src.connect(proc); proc.connect(sink); sink.connect(S.ctx.destination);
+  connect();
+  S.recog = { kind: 'gemini', stop() {
+    R.active = false; proc.onaudioprocess = null;
+    try { src.disconnect(); proc.disconnect(); sink.disconnect(); } catch (e) {}
+    const ws = R.ws; R.ws = null;
+    if (ws) { try { if (ws.readyState === 1) ws.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } })); } catch (e) {} setTimeout(() => { try { ws.close(); } catch (e) {} }, 300); }
+  } };
+}
+
+/* 엔진 설정 화면 */
+const ENGINE_DESC = {
+  gemini: '구글의 실시간 받아쓰기 전용 모델을 씁니다. 억양·잡음·전화 음질에 강하고, 보이스피싱 키워드를 어휘 힌트로 함께 넘겨 더 잘 알아듣게 합니다. 통화 음성이 인식 서버를 거칩니다.',
+  vosk: '음성이 기기 밖으로 나가지 않는 대신, 소형 모델이라 억양이 있거나 음질이 나쁘면 정확도가 크게 떨어집니다.',
+};
+function setProxyState(st, msg) {
+  S.proxyState = st;
+  $('proxyDot').className = 'dot' + (st === 'ok' ? ' ok' : st === 'error' ? ' bad' : '');
+  $('proxyText').textContent = !cfg.proxyUrl ? '서버 주소 없음' : st === 'ok' ? '인식 서버 연결 확인됨' : st === 'error' ? '인식 서버 오류' : '저장됨 (연결 테스트 전)';
+  if (msg !== undefined) $('proxyMsg').textContent = msg;
+  updateStatusDot();
+}
+function renderEngine() {
+  document.querySelectorAll('#engines .btn').forEach((b) => b.classList.toggle('blue', b.dataset.engine === cfg.engine));
+  $('engineDesc').textContent = ENGINE_DESC[cfg.engine];
+  $('geminiBox').classList.toggle('hidden', cfg.engine !== 'gemini');
+  $('voskBox').classList.toggle('hidden', cfg.engine !== 'vosk');
+  $('setProxy').value = cfg.proxyUrl;
+  if (cfg.engine === 'gemini' && !cfg.proxyUrl) $('proxyMsg').textContent = '서버 주소를 넣기 전까지는 온디바이스 엔진으로 동작합니다. 만드는 방법은 README의 "고정확도 인식 서버 만들기"를 보세요.';
+  updateStatusDot();
+}
+document.querySelectorAll('#engines .btn').forEach((b) => (b.onclick = () => {
+  cfg.engine = b.dataset.engine; store.set('engine', cfg.engine); renderEngine();
+  if (effEngine() === 'vosk' && S.ctx && S.modelState !== 'ready' && S.modelState !== 'loading') loadModel();
+}));
+$('btnProxySave').onclick = () => {
+  let u = $('setProxy').value.trim();
+  if (u && !/^(https?|wss?):\/\//.test(u)) u = 'https://' + u;
+  cfg.proxyUrl = u; store.set('proxyUrl', u); setProxyState(u ? 'saved' : 'idle', u ? '저장했습니다. "연결 테스트"로 확인해 보세요.' : '');
+  renderEngine();
+  if (effEngine() === 'vosk' && S.ctx && S.modelState === 'idle') loadModel();
+};
+$('btnProxyTest').onclick = () => {
+  $('btnProxySave').click();
+  if (!cfg.proxyUrl) return;
+  $('proxyMsg').textContent = '연결 중…';
+  let done = false, ws;
+  const finish = (ok, msg) => { if (done) return; done = true; try { ws.close(); } catch (e) {} setProxyState(ok ? 'ok' : 'error', msg); };
+  try { ws = new WebSocket(wsUrl(cfg.proxyUrl)); } catch (e) { finish(false, '주소 형식이 올바르지 않습니다.'); return; }
+  const t = setTimeout(() => finish(false, '응답이 없습니다 (10초). 주소를 확인하세요.'), 10000);
+  ws.onopen = () => ws.send(JSON.stringify(geminiSetup()));
+  ws.onmessage = async (ev) => {
+    let m; try { m = JSON.parse(await wsText(ev.data)); } catch (e) { return; }
+    if (m.setupComplete) { clearTimeout(t); finish(true, '연결 성공! 통화하면 고정확도 인식이 작동합니다.'); }
+  };
+  ws.onclose = (ev) => { clearTimeout(t); finish(false, `연결 실패 (${ev.code}${ev.reason ? ': ' + ev.reason : ''}). Worker 주소, GEMINI_API_KEY, 허용 주소(ALLOWED_ORIGINS)를 확인하세요.`); };
+};
 
 /* ================= 오디오 송출 경로 ================= */
 async function setupAudio() {
@@ -967,7 +1140,7 @@ $('btnSolo').onclick = () => {
   S.solo = true; S.info = { num: '', name: '혼자 테스트' };
   prepareCallScreen('혼자 테스트', '내 마이크 소리를 인식합니다');
   startTimer();
-  addCap('마이크에 대고 말해 보세요. 예: "검찰청 수사관인데 안전계좌로 이체하세요"', true);
+  addCap(`마이크에 대고 말해 보세요. 예: "검찰청 수사관인데 안전계좌로 이체하세요" (인식 엔진: ${effEngine() === 'gemini' ? 'Gemini 고정확도' : '온디바이스'})`, true);
   startRecognition(S.mic);
 };
 function stopSolo() {
@@ -992,12 +1165,14 @@ $('btnStart').onclick = async () => {
     const st = S.detector.state(); renderRisk(st);
     if (st.level < S.alertLevel) S.alertLevel = st.level;
   }, 1000);
-  loadModel();
+  if (effEngine() === 'vosk') loadModel();
 };
 
 loadSettingsUI();
 buildDetector();
 renderDial();
+renderEngine();
+setProxyState(cfg.proxyUrl ? 'saved' : 'idle');
 </script>
 </body>
 </html>
