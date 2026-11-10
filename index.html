@@ -1,0 +1,1003 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#000000">
+<title>보이스가드</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --green: #30c85a; --red: #ff3b30; --blue: #3a8bff; --yellow: #ffd60a; --orange: #ff9f0a;
+    --key: rgba(255,255,255,.17); --key-on: rgba(255,255,255,.42);
+    --sub: #8e8e93; --group: #1c1c1e; --line: #2c2c2e; --callbg: #262626;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #000; color: #fff; overscroll-behavior: none;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    -webkit-tap-highlight-color: transparent; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  input, textarea { font: inherit; color: #fff; background: #2c2c2e; border: 0; border-radius: 10px; padding: 11px 12px; width: 100%; }
+  textarea { min-height: 130px; font-size: 13px; font-family: ui-monospace, Menlo, monospace; resize: vertical; }
+  svg { display: block; }
+  .hidden { display: none !important; }
+  #root { position: relative; max-width: 440px; height: 100dvh; margin: 0 auto; overflow: hidden; background: #000; }
+  .view { position: absolute; inset: 0; display: flex; flex-direction: column;
+    padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+
+  /* ---------- 시작 ---------- */
+  #vStart { align-items: center; justify-content: center; text-align: center; padding: 32px 24px; gap: 14px; }
+  #vStart .logo { width: 84px; height: 84px; border-radius: 22px; background: linear-gradient(160deg, #3a8bff, #1d4fd6);
+    display: grid; place-items: center; box-shadow: 0 10px 40px rgba(58,139,255,.35); }
+  #vStart h1 { margin: 8px 0 0; font-size: 28px; letter-spacing: -0.02em; }
+  #vStart p { margin: 0; color: var(--sub); line-height: 1.6; font-size: 15px; }
+  .btnPrimary { background: var(--blue); color: #fff; border-radius: 14px; padding: 15px 20px; font-weight: 700; font-size: 17px; width: 100%; max-width: 320px; margin-top: 10px; }
+  .btnPrimary:disabled { opacity: .5; }
+
+  /* ---------- 홈: 키패드 ---------- */
+  .tab { flex: 1; display: flex; flex-direction: column; min-height: 0; padding-bottom: 96px; }
+  .kpTop { padding: 14px 20px 0; display: flex; }
+  .mine { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.1); border-radius: 999px; padding: 7px 12px 7px 10px; font-size: 13px; color: #d1d1d6; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--orange); flex: none; }
+  .dot.ok { background: var(--green); } .dot.bad { background: var(--red); }
+  .dialArea { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 0 20px 26px; min-height: 90px; }
+  .dialNum { font-size: 40px; font-weight: 400; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; min-height: 50px; white-space: nowrap; }
+  .dialSub { color: var(--blue); font-size: 15px; min-height: 20px; margin-top: 4px; }
+  .keys { display: grid; grid-template-columns: repeat(3, var(--k)); justify-content: center; gap: 16px 26px; --k: min(23vw, 82px); }
+  .key { width: var(--k); height: var(--k); border-radius: 50%; background: var(--key); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; transition: background .12s; touch-action: manipulation; }
+  .key:active, .key.on { background: var(--key-on); }
+  .key b { font-size: calc(var(--k) * .43); font-weight: 400; line-height: 1; }
+  .key i { font-style: normal; font-size: 10.5px; font-weight: 700; letter-spacing: .22em; margin-top: 2px; min-height: 13px; padding-left: .22em; }
+  .key.sym b { font-size: calc(var(--k) * .48); }
+  .callRow { display: grid; grid-template-columns: repeat(3, var(--k)); justify-content: center; gap: 0 26px; --k: min(23vw, 82px); margin-top: 18px; align-items: center; }
+  .round { width: var(--k, 80px); height: var(--k, 80px); border-radius: 50%; display: grid; place-items: center; }
+  .green { background: var(--green); } .red { background: var(--red); }
+  .round:active { filter: brightness(1.2); }
+  .delBtn { justify-self: center; opacity: 0; pointer-events: none; transition: opacity .15s; padding: 10px; }
+  .delBtn.show { opacity: 1; pointer-events: auto; }
+
+  /* ---------- 탭바 ---------- */
+  .tabbar { position: absolute; left: 16px; right: 16px; bottom: calc(14px + env(safe-area-inset-bottom)); display: flex;
+    background: rgba(40,40,42,.92); backdrop-filter: blur(20px); border-radius: 999px; padding: 6px; z-index: 3; }
+  .tabbar button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 0 6px; border-radius: 999px; color: #e5e5ea; font-size: 12px; }
+  .tabbar button.on { background: rgba(255,255,255,.1); color: var(--blue); }
+  .tabbar svg { width: 24px; height: 24px; fill: currentColor; }
+
+  /* ---------- 홈: 최근기록 / 설정 ---------- */
+  .page { flex: 1; overflow-y: auto; padding: 18px 16px 24px; -webkit-overflow-scrolling: touch; }
+  .page h1 { font-size: 32px; margin: 6px 4px 14px; letter-spacing: -0.02em; }
+  .pageHead { display: flex; align-items: baseline; justify-content: space-between; }
+  .linkBtn { color: var(--blue); font-size: 16px; }
+  .group { background: var(--group); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+  .group h2 { font-size: 13px; color: var(--sub); margin: 0 0 10px; font-weight: 600; }
+  .group p { color: var(--sub); font-size: 13px; line-height: 1.55; margin: 8px 0 0; }
+  .rec { display: flex; align-items: center; gap: 12px; padding: 11px 4px; border-bottom: 1px solid var(--line); }
+  .rec:last-child { border-bottom: 0; }
+  .rec .ic { width: 18px; color: var(--sub); font-size: 15px; text-align: center; }
+  .rec .who { flex: 1; min-width: 0; }
+  .rec .who b { display: block; font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rec .who small { color: var(--sub); font-size: 13px; }
+  .rec.missed .who b { color: var(--red); }
+  .rec .when { text-align: right; color: var(--sub); font-size: 13px; }
+  .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; margin-top: 4px; }
+  .badge.l0 { background: rgba(48,200,90,.16); color: var(--green); }
+  .badge.l1 { background: rgba(255,159,10,.18); color: var(--orange); }
+  .badge.l2 { background: rgba(255,59,48,.2); color: var(--red); }
+  .empty { color: var(--sub); text-align: center; padding: 40px 0; font-size: 15px; }
+  .themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .theme { border-radius: 12px; padding: 8px; background: #2c2c2e; border: 2px solid transparent; text-align: center; font-size: 13px; }
+  .theme.on { border-color: var(--blue); }
+  .mini { aspect-ratio: 9 / 15; border-radius: 9px; background: var(--callbg); margin-bottom: 7px; padding: 10% 10% 8%; display: flex; flex-direction: column; align-items: center; gap: 5%; }
+  .mini .n { width: 55%; height: 7%; background: #fff; border-radius: 3px; }
+  .mini .c { flex: 1; width: 100%; display: flex; flex-direction: column; justify-content: flex-end; gap: 6%; }
+  .mini .t { height: 5%; min-height: 4px; background: #9a9a9e; border-radius: 2px; }
+  .mini .t.h { background: var(--yellow); width: 45%; }
+  .mini .g { height: 5%; min-height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--orange) 60%, #444 60%); }
+  .mini .b { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8%; width: 80%; }
+  .mini .b span { aspect-ratio: 1; border-radius: 50%; background: #555; }
+  .mini .b span:nth-child(5) { background: var(--red); }
+  .field { margin-top: 10px; }
+  .field label { display: block; font-size: 12px; color: var(--sub); margin-bottom: 5px; }
+  .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .btn { background: #2c2c2e; border-radius: 10px; padding: 11px 10px; font-weight: 600; font-size: 15px; text-align: center; }
+  .btn.blue { background: var(--blue); }
+  .btn:disabled { opacity: .45; }
+  .fileBtn { display: block; }
+  .fileBtn input { display: none; }
+  .modelLine { font-size: 14px; display: flex; align-items: center; gap: 8px; }
+
+  /* ---------- 수신 / 통화 화면 ---------- */
+  .callView { background: linear-gradient(180deg, #2e2e30 0%, var(--callbg) 45%, #1e1e1f 100%); }
+  .callHead { text-align: center; padding: 54px 20px 0; }
+  .callLabel { color: #b9b9be; font-size: 20px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 6px; font-variant-numeric: tabular-nums; }
+  .callName { font-size: clamp(34px, 11vw, 50px); font-weight: 700; letter-spacing: -0.01em; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .callSub { color: #b9b9be; font-size: 17px; margin-top: 4px; min-height: 22px; font-variant-numeric: tabular-nums; }
+  .guard { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #9bd3ff; background: rgba(58,139,255,.14); padding: 6px 12px; border-radius: 999px; margin-top: 14px; }
+  .guard svg { width: 14px; height: 14px; fill: currentColor; }
+  .inMid { flex: 1; }
+  .inSmall { display: flex; justify-content: space-between; padding: 0 12%; margin-bottom: 34px; }
+  .inBig { display: flex; justify-content: space-between; padding: 0 9%; margin-bottom: 46px; }
+  .cbtn { display: flex; flex-direction: column; align-items: center; gap: 9px; font-size: 15px; color: #fff; }
+  .cbtn .round { --k: min(22vw, 82px); background: rgba(255,255,255,.16); }
+  .cbtn .round.sm { --k: 54px; }
+  .cbtn .round.green { background: var(--green); } .cbtn .round.red { background: var(--red); }
+  .cbtn.on .round { background: #fff; } .cbtn.on .round svg { fill: #1c1c1e; }
+  .cbtn svg { width: 46%; height: 46%; fill: #fff; }
+  .cbtn .round.sm svg { width: 50%; height: 50%; }
+  .cbtn:disabled { opacity: .35; }
+
+  .callCenter { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 14px 22px 10px; position: relative; }
+  .riskPill { align-self: center; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 999px;
+    background: rgba(48,200,90,.16); color: var(--green); transition: background .3s, color .3s; }
+  .riskPill.l1 { background: rgba(255,159,10,.2); color: var(--orange); }
+  .riskPill.l2 { background: rgba(255,59,48,.25); color: #ff6961; }
+  .riskPill svg { width: 14px; height: 14px; fill: currentColor; }
+  .riskPanel { background: rgba(0,0,0,.28); border-radius: 14px; padding: 12px; }
+  .riskTop { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .riskTop b { font-size: 18px; }
+  .riskTop span { color: var(--sub); font-size: 13px; }
+  .gauge { height: 10px; border-radius: 5px; background: rgba(255,255,255,.12); position: relative; overflow: hidden; }
+  .gauge .fill { height: 100%; width: 0; background: var(--green); transition: width .3s, background .3s; }
+  .gauge .tick { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--orange); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: rgba(255,214,10,.16); color: var(--yellow); }
+  .meter { height: 3px; border-radius: 2px; background: rgba(255,255,255,.1); margin: 10px auto 0; width: 40%; overflow: hidden; }
+  .meter div { height: 100%; width: 0; background: rgba(255,255,255,.7); transition: width .1s; }
+  .capList { flex: 1; min-height: 0; overflow-y: auto; margin-top: 10px; display: flex; flex-direction: column;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22%); mask-image: linear-gradient(to bottom, transparent 0, #000 22%); }
+  .capList::before { content: ""; flex: 1; }
+  .cap { font-size: 20px; line-height: 1.5; padding: 4px 0; opacity: .5; word-break: keep-all; overflow-wrap: anywhere; }
+  .cap:nth-last-child(-n+2) { opacity: 1; }
+  .cap small { display: block; font-size: 11px; color: var(--sub); font-variant-numeric: tabular-nums; }
+  .cap.sys { font-size: 14px; color: var(--sub); opacity: 1; }
+  .cap mark { background: rgba(255,214,10,.22); color: var(--yellow); border-radius: 5px; padding: 0 3px; font-weight: 700; }
+  .capPartial { font-size: 20px; line-height: 1.5; color: #8e8e93; min-height: 30px; }
+  .realMid { flex: 1; display: flex; align-items: flex-start; justify-content: center; }
+  .callBtns { display: grid; grid-template-columns: repeat(3, 1fr); row-gap: 22px; padding: 10px 7% 44px; justify-items: center; }
+  /* 테마 */
+  #vCall .realMid { display: none; }
+  #vCall.t-real .realMid { display: flex; }
+  #vCall.t-real .riskPill, #vCall.t-real .riskPanel, #vCall.t-real .capList, #vCall.t-real .capPartial, #vCall.t-real .meter { display: none; }
+  #vCall.t-caption .riskPanel { display: none; }
+  #vCall.t-analysis .riskPill { display: none; }
+  #vCall.t-analysis .cap { font-size: 16px; }
+  #vCall.t-analysis .capPartial { font-size: 16px; }
+
+  /* 통화 중 키패드 */
+  .dtmf { position: absolute; left: 0; right: 0; bottom: 0; top: 40%; background: var(--callbg); display: flex; flex-direction: column; align-items: center; padding-top: 10px; z-index: 4; }
+  .dtmf .dtmfNum { font-size: 30px; min-height: 40px; letter-spacing: .05em; margin-bottom: 10px; }
+  .dtmf .keys { --k: min(20vw, 72px); gap: 12px 24px; }
+  .dtmf .hideBtn { margin-top: 16px; font-size: 17px; color: #fff; padding: 8px 20px; }
+
+  /* 시트 */
+  .backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.45); z-index: 9; }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--group); border-radius: 22px 22px 0 0;
+    padding: 10px 16px calc(22px + env(safe-area-inset-bottom)); max-height: 78%; overflow-y: auto; }
+  .sheet .grab { width: 38px; height: 5px; border-radius: 3px; background: #48484a; margin: 0 auto 12px; }
+  .sheet h3 { margin: 0 0 12px; font-size: 18px; }
+  .log { font-size: 13px; color: var(--sub); max-height: 180px; overflow-y: auto; }
+  .log div { padding: 4px 0; border-bottom: 1px solid var(--line); }
+
+  /* 경고 */
+  .alert { position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; }
+  .alert.lv1 { background: #b45309; } .alert.lv2 { background: #b91c1c; animation: pulse 1s infinite alternate; }
+  @keyframes pulse { from { background: #b91c1c; } to { background: #7f1010; } }
+  .alert .ai { font-size: 56px; }
+  .alert h1 { font-size: 34px; margin: 10px 0; letter-spacing: -0.02em; }
+  .alert p { font-size: 17px; line-height: 1.6; max-width: 380px; margin: 0; }
+  .alert .chips { justify-content: center; margin: 16px 0 0; }
+  .alert .chip { background: rgba(255,255,255,.2); color: #fff; font-size: 14px; padding: 4px 11px; }
+  .alert .row2 { width: 100%; max-width: 360px; margin-top: 24px; }
+  .alert .btn { background: rgba(255,255,255,.22); padding: 14px; }
+  .alert .btn.white { background: #fff; color: #b91c1c; }
+  .alert .foot { font-size: 14px; opacity: .85; margin-top: 18px; }
+  .toast { position: absolute; left: 50%; top: calc(16px + env(safe-area-inset-top)); transform: translateX(-50%); background: rgba(60,60,62,.95);
+    padding: 10px 16px; border-radius: 999px; font-size: 14px; z-index: 30; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="root">
+
+  <!-- ============ 시작 ============ -->
+  <section class="view" id="vStart">
+    <div class="logo"><svg width="44" height="44" viewBox="0 0 24 24" fill="#fff"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1.2 15.2l-4-4 1.4-1.4 2.6 2.6 5.6-5.6 1.4 1.4-7 7z"/></svg></div>
+    <h1>보이스가드</h1>
+    <p>통화 중 상대방 음성을 이 기기 안에서 실시간으로 인식해<br>보이스피싱이 의심되면 바로 알려드립니다.<br>음성은 어떤 서버로도 전송되지 않습니다.</p>
+    <button class="btnPrimary" id="btnStart">시작하기</button>
+    <p style="font-size:13px">마이크 권한을 허용해 주세요</p>
+  </section>
+
+  <!-- ============ 홈 ============ -->
+  <section class="view hidden" id="vHome">
+    <!-- 키패드 -->
+    <div class="tab" id="tabKeypad">
+      <div class="kpTop"><button class="mine" id="myChip"><span class="dot" id="statusDot"></span><span id="myNumTxt">번호 받는 중…</span></button></div>
+      <div class="dialArea"><div class="dialNum" id="dialNum"></div><div class="dialSub" id="dialSub"></div></div>
+      <div class="keys" id="keys"></div>
+      <div class="callRow">
+        <span></span>
+        <button class="round green" id="btnDial" aria-label="전화 걸기"><svg width="36" height="36" viewBox="0 0 24 24" fill="#fff"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg></button>
+        <button class="delBtn" id="btnDel" aria-label="지우기"><svg width="30" height="30" viewBox="0 0 24 24" fill="#8e8e93"><path d="M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 17 14 13.41 10.41 17 9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59z"/></svg></button>
+      </div>
+    </div>
+
+    <!-- 최근기록 -->
+    <div class="tab hidden" id="tabRecents">
+      <div class="page">
+        <div class="pageHead"><h1>최근기록</h1><button class="linkBtn" id="btnClearRecents">모두 지우기</button></div>
+        <div class="group" style="padding:0 12px" id="recentList"></div>
+      </div>
+    </div>
+
+    <!-- 설정 -->
+    <div class="tab hidden" id="tabSettings">
+      <div class="page">
+        <h1>설정</h1>
+        <div class="group">
+          <h2>내 정보</h2>
+          <div class="modelLine"><span>내 번호</span><b id="setMyNum" style="margin-left:auto">-</b></div>
+          <div class="field"><label for="setName">상대방에게 보일 이름 (비우면 번호로 표시)</label><input type="text" id="setName" maxlength="20" placeholder="예: 김민준"></div>
+        </div>
+
+        <div class="group">
+          <h2>통화 화면 테마</h2>
+          <div class="themes" id="themes">
+            <button class="theme" data-theme="real"><div class="mini"><div class="n"></div><div class="c"></div><div class="b"><span></span><span></span><span></span><span></span><span></span><span></span></div></div>실제 전화</button>
+            <button class="theme" data-theme="caption"><div class="mini"><div class="n"></div><div class="c"><div class="t" style="width:70%"></div><div class="t h"></div><div class="t" style="width:85%"></div></div><div class="b"><span></span><span></span><span></span><span></span><span></span><span></span></div></div>실시간 자막</button>
+            <button class="theme" data-theme="analysis"><div class="mini"><div class="n"></div><div class="c"><div class="g"></div><div class="t" style="width:70%"></div><div class="t h"></div></div><div class="b"><span></span><span></span><span></span><span></span><span></span><span></span></div></div>분석 모드</button>
+          </div>
+          <p id="themeDesc"></p>
+        </div>
+
+        <div class="group">
+          <h2>탐지 기준</h2>
+          <div class="row3">
+            <div class="field" style="margin:0"><label for="setSuspect">의심 점수</label><input type="number" id="setSuspect" min="1" inputmode="numeric"></div>
+            <div class="field" style="margin:0"><label for="setDanger">위험 점수</label><input type="number" id="setDanger" min="1" inputmode="numeric"></div>
+            <div class="field" style="margin:0"><label for="setWindow">판단 구간(초)</label><input type="number" id="setWindow" min="10" step="10" inputmode="numeric"></div>
+          </div>
+          <p>판단 구간 안에 쌓인 키워드 점수로 판단합니다. 가중치가 1이면 점수 = 언급 횟수입니다.</p>
+        </div>
+
+        <div class="group">
+          <h2>키워드 데이터</h2>
+          <label class="btn fileBtn">CSV 파일 불러오기<input type="file" id="csvInput" accept=".csv,.txt,text/csv"></label>
+          <textarea id="kwText" style="margin-top:10px" spellcheck="false"></textarea>
+          <div class="row2"><button class="btn blue" id="btnApply">적용</button><button class="btn" id="btnReset">기본값</button></div>
+          <p id="kwInfo"></p>
+        </div>
+
+        <div class="group">
+          <h2>음성인식 모델</h2>
+          <div class="modelLine"><span class="dot" id="modelDot"></span><span id="modelText">대기 중</span></div>
+          <div class="field"><label for="setModel">모델 주소</label><input type="text" id="setModel"></div>
+          <div class="row2"><button class="btn" id="btnModelReload">다시 불러오기</button><button class="btn" id="btnModelClear">캐시 지우고 다시 받기</button></div>
+          <p id="modelMsg"></p>
+        </div>
+
+        <div class="group">
+          <h2>테스트</h2>
+          <button class="btn blue" id="btnSolo" style="width:100%">🎧 혼자 테스트 (내 마이크로 인식)</button>
+          <p>통화 없이 통화 화면에서 내 목소리로 자막과 탐지가 잘 되는지 확인합니다. 예: "검찰청 수사관인데 안전계좌로 이체하세요"</p>
+        </div>
+      </div>
+    </div>
+
+    <nav class="tabbar">
+      <button data-tab="tabRecents"><svg viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z"/></svg>최근기록</button>
+      <button data-tab="tabKeypad" class="on"><svg viewBox="0 0 24 24"><circle cx="5" cy="4" r="2.2"/><circle cx="12" cy="4" r="2.2"/><circle cx="19" cy="4" r="2.2"/><circle cx="5" cy="10.5" r="2.2"/><circle cx="12" cy="10.5" r="2.2"/><circle cx="19" cy="10.5" r="2.2"/><circle cx="5" cy="17" r="2.2"/><circle cx="12" cy="17" r="2.2"/><circle cx="19" cy="17" r="2.2"/><circle cx="12" cy="22.5" r="1.5"/></svg>키패드</button>
+      <button data-tab="tabSettings"><svg viewBox="0 0 24 24"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>설정</button>
+    </nav>
+  </section>
+
+  <!-- ============ 전화 수신 ============ -->
+  <section class="view callView hidden" id="vIncoming">
+    <div class="callHead">
+      <div class="callLabel">휴대전화</div>
+      <div class="callName" id="inName"></div>
+      <div class="callSub" id="inSub"></div>
+      <div class="guard"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>보이스가드가 이 통화를 보호합니다</div>
+    </div>
+    <div class="inMid"></div>
+    <div class="inSmall">
+      <button class="cbtn" id="btnInMsg"><span class="round sm"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg></span>메시지</button>
+      <button class="cbtn" id="btnInLater"><span class="round sm"><svg viewBox="0 0 24 24"><path d="M22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72zM7.88 3.39L6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM12.5 8H11v6l4.75 2.85.75-1.23-4-2.37V8zM12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 16c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg></span>나중에 알림</button>
+    </div>
+    <div class="inBig">
+      <button class="cbtn" id="btnReject"><span class="round red"><svg viewBox="0 0 24 24" style="transform:rotate(135deg)"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg></span>거절</button>
+      <button class="cbtn" id="btnAnswer"><span class="round green"><svg viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg></span>수락</button>
+    </div>
+  </section>
+
+  <!-- ============ 통화 중 ============ -->
+  <section class="view callView t-caption hidden" id="vCall">
+    <div class="callHead" style="padding-top:44px">
+      <div class="callLabel" id="callLabel">휴대전화</div>
+      <div class="callName" id="callName"></div>
+      <div class="callSub" id="callSub"></div>
+      <div class="meter"><div id="meter"></div></div>
+    </div>
+    <div class="callCenter">
+      <button class="riskPill" id="riskPill"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span id="riskPillText">정상 · 탐지 작동 중</span></button>
+      <div class="riskPanel" id="riskPanel">
+        <div class="riskTop"><b id="riskLevel">정상</b><span id="riskScore">0 / 6점</span></div>
+        <div class="gauge"><div class="fill" id="gaugeFill"></div><div class="tick" id="gaugeTick"></div></div>
+        <div class="chips" id="riskChips"></div>
+      </div>
+      <div class="capList" id="capList"></div>
+      <div class="capPartial" id="capPartial"></div>
+      <div class="realMid"><div class="guard"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>보이스피싱 탐지 작동 중</div></div>
+    </div>
+    <div class="callBtns">
+      <button class="cbtn" id="btnCaption"><span class="round"><svg viewBox="0 0 24 24"><path d="M19 4H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1c0 .55-.45 1-1 1h-3c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1z"/></svg></span>자막</button>
+      <button class="cbtn" id="btnDemo"><span class="round"><svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></span>시연 음성</button>
+      <button class="cbtn" id="btnMute"><span class="round"><svg viewBox="0 0 24 24"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/></svg></span>소리 끔</button>
+      <button class="cbtn" id="btnMore"><span class="round"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2.3"/><circle cx="12" cy="12" r="2.3"/><circle cx="19" cy="12" r="2.3"/></svg></span>더보기</button>
+      <button class="cbtn" id="btnHang"><span class="round red"><svg viewBox="0 0 24 24" style="transform:rotate(135deg)"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg></span>종료</button>
+      <button class="cbtn" id="btnKeypad"><span class="round"><svg viewBox="0 0 24 24"><circle cx="5" cy="4" r="2.2"/><circle cx="12" cy="4" r="2.2"/><circle cx="19" cy="4" r="2.2"/><circle cx="5" cy="10.5" r="2.2"/><circle cx="12" cy="10.5" r="2.2"/><circle cx="19" cy="10.5" r="2.2"/><circle cx="5" cy="17" r="2.2"/><circle cx="12" cy="17" r="2.2"/><circle cx="19" cy="17" r="2.2"/><circle cx="12" cy="22.5" r="1.5"/></svg></span>키패드</button>
+    </div>
+    <div class="dtmf hidden" id="dtmfPad">
+      <div class="dtmfNum" id="dtmfNum"></div>
+      <div class="keys" id="dtmfKeys"></div>
+      <button class="hideBtn" id="btnDtmfHide">숨기기</button>
+    </div>
+  </section>
+
+  <!-- ============ 시트: 더보기 ============ -->
+  <div class="backdrop hidden" id="backdrop"></div>
+  <div class="sheet hidden" id="sheetMore">
+    <div class="grab"></div>
+    <h3>보이스피싱 탐지 현황</h3>
+    <div class="riskPanel" style="background:#2c2c2e">
+      <div class="riskTop"><b id="mLevel">정상</b><span id="mScore">0 / 6점</span></div>
+      <div class="gauge"><div class="fill" id="mFill"></div><div class="tick" id="mTick"></div></div>
+      <div class="chips" id="mChips"></div>
+    </div>
+    <p style="color:var(--sub);font-size:13px" id="mWindow"></p>
+    <h3 style="margin-top:16px">탐지 기록</h3>
+    <div class="log" id="mLog"></div>
+    <h3 style="margin-top:16px">화면 테마</h3>
+    <div class="row3" id="mThemes">
+      <button class="btn" data-theme="real">실제 전화</button>
+      <button class="btn" data-theme="caption">실시간 자막</button>
+      <button class="btn" data-theme="analysis">분석 모드</button>
+    </div>
+  </div>
+
+  <!-- ============ 시트: 시연 음성 ============ -->
+  <div class="sheet hidden" id="sheetDemo">
+    <div class="grab"></div>
+    <h3>시연 음성 보내기</h3>
+    <p style="color:var(--sub);font-size:14px;line-height:1.55;margin:0 0 12px">보이스피싱 녹음 파일(예: 금융감독원 '그놈 목소리')을 고르면 내 목소리 대신 상대방에게 통화 음성으로 전달됩니다. 재생하는 동안 내 마이크는 자동으로 꺼집니다.</p>
+    <label class="btn fileBtn" id="demoPick">음성 파일 고르기<input type="file" id="fileInput" accept="audio/*"></label>
+    <p style="color:var(--sub);font-size:13px" id="demoName">선택된 파일 없음</p>
+    <div class="row2"><button class="btn blue" id="btnFilePlay" disabled>▶ 송출 시작</button><button class="btn" id="btnFileStop" disabled>■ 정지</button></div>
+  </div>
+
+  <!-- ============ 경고 ============ -->
+  <div class="alert hidden" id="alertBox">
+    <div class="ai">⚠️</div>
+    <h1 id="alertTitle">보이스피싱 의심</h1>
+    <p id="alertMsg"></p>
+    <div class="chips" id="alertKw"></div>
+    <div class="row2">
+      <button class="btn" id="btnAlertOk">확인</button>
+      <button class="btn white" id="btnAlertHang">통화 끊기</button>
+    </div>
+    <p class="foot">의심되면 전화를 끊고 112(경찰) 또는 1332(금융감독원)에 확인하세요.</p>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+  <audio id="ringAudio" src="ringtone.mp3" loop preload="auto"></audio>
+  <audio id="remoteAudio" autoplay playsinline></audio>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vosk-browser@0.0.8/dist/vosk.js"></script>
+<script src="detector.js"></script>
+<script>
+'use strict';
+/* ================= 설정 ================= */
+const ID_PREFIX = 'voiceguard-sichs-';   // 다른 PeerJS 사용자와 번호가 겹치지 않게 하는 접두어
+const NUM_LEN = 11;
+const DEFAULTS = { suspect: 3, danger: 6, windowSec: 120, modelUrl: 'models/vosk-model-small-ko-0.22.tar.gz', theme: 'caption', myName: '' };
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('vg_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('vg_' + k, JSON.stringify(v)); } catch (e) {} },
+};
+const cfg = {};
+for (const k of Object.keys(DEFAULTS)) cfg[k] = store.get(k, DEFAULTS[k]);
+cfg.csv = store.get('csv', VG.SAMPLE_CSV);
+
+const THEME_DESC = {
+  real: '실제 전화 화면처럼 이름과 버튼만 보입니다. 탐지는 뒤에서 계속 작동하고, 의심되면 경고가 뜹니다.',
+  caption: '화면 가운데에 상대방 말이 실시간 자막으로 나오고, 탐지된 키워드가 노란색으로 강조됩니다.',
+  analysis: '자막과 함께 위험도 점수 막대와 탐지된 키워드 목록이 보입니다. 발표·시연용으로 좋습니다.',
+};
+const LEVEL_NAME = ['정상', '보이스피싱 의심', '보이스피싱 위험'];
+const PHONE_D = 'M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z';
+const MIC_ON = 'M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.2 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z';
+const MIC_OFF = 'M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z';
+
+/* ================= 상태 ================= */
+const $ = (id) => document.getElementById(id);
+const S = {
+  ctx: null, mic: null, micGain: null, outDest: null, fileEl: null, fileUrl: null,
+  peer: null, myId: null, call: null, pendingCall: null, pendingInfo: null, info: null, remoteStream: null,
+  model: null, modelState: 'idle', recog: null, solo: false, netOk: false,
+  detector: null, alertLevel: 0, maxLevel: 0, hitCount: 0, log: [],
+  viewTheme: cfg.theme, dial: '', dtmf: '', muted: false,
+  callStart: 0, connected: false, timerId: null, ringbackId: null, vibrateId: null, ending: false,
+};
+
+/* ================= 공통 도구 ================= */
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = (n) => (Math.round(n * 10) / 10).toString();
+const pad = (n) => String(n).padStart(2, '0');
+const clock = (d = new Date()) => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+function fmtNum(d) {
+  d = String(d || '').replace(/\D/g, '');
+  if (d.length < 4) return d;
+  if (d.length < 8) return d.slice(0, 3) + '-' + d.slice(3);
+  return d.slice(0, 3) + '-' + d.slice(3, 7) + '-' + d.slice(7, 11);
+}
+function fmtDur(sec) { return sec >= 60 ? `${Math.floor(sec / 60)}분 ${sec % 60}초` : `${sec}초`; }
+let toastT = null;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.remove('hidden'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.add('hidden'), 2200); }
+function showView(id) { ['vStart', 'vHome', 'vIncoming', 'vCall'].forEach((v) => $(v).classList.toggle('hidden', v !== id)); closeSheets(); }
+function showTab(id) {
+  ['tabKeypad', 'tabRecents', 'tabSettings'].forEach((t) => $(t).classList.toggle('hidden', t !== id));
+  document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.tab === id));
+  if (id === 'tabRecents') renderRecents();
+}
+document.querySelectorAll('.tabbar button').forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
+
+/* ================= 소리 ================= */
+function tone(freqs, dur, vol = 0.12, toCall = false) {
+  if (!S.ctx) return;
+  const t = S.ctx.currentTime, g = S.ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+  g.gain.setValueAtTime(vol, t + dur - 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  g.connect(S.ctx.destination);
+  if (toCall && S.outDest) g.connect(S.outDest);
+  freqs.forEach((f) => { const o = S.ctx.createOscillator(); o.frequency.value = f; o.connect(g); o.start(t); o.stop(t + dur); });
+}
+const DTMF = { 1: [697, 1209], 2: [697, 1336], 3: [697, 1477], 4: [770, 1209], 5: [770, 1336], 6: [770, 1477],
+  7: [852, 1209], 8: [852, 1336], 9: [852, 1477], '*': [941, 1209], 0: [941, 1336], '#': [941, 1477] };
+function ringStart() {
+  const a = $('ringAudio'); a.currentTime = 0; a.play().catch(() => {});
+  if (navigator.vibrate) { navigator.vibrate([800, 600]); S.vibrateId = setInterval(() => navigator.vibrate([800, 600]), 1400); }
+}
+function ringStop() { const a = $('ringAudio'); a.pause(); clearInterval(S.vibrateId); if (navigator.vibrate) navigator.vibrate(0); }
+function ringbackStart() { ringbackStop(); tone([440, 480], 1, 0.06); S.ringbackId = setInterval(() => tone([440, 480], 1, 0.06), 3000); }  // 한국식 연결음(1초 울림·2초 쉼)
+function ringbackStop() { clearInterval(S.ringbackId); S.ringbackId = null; }
+function beep(times, freq) { for (let i = 0; i < times; i++) setTimeout(() => tone([freq], 0.2, 0.25), i * 280); }
+
+/* ================= 키패드 ================= */
+const KEYS = [['1', ''], ['2', 'ABC'], ['3', 'DEF'], ['4', 'GHI'], ['5', 'JKL'], ['6', 'MNO'], ['7', 'PQRS'], ['8', 'TUV'], ['9', 'WXYZ'], ['*', ''], ['0', '+'], ['#', '']];
+function buildKeys(box, onPress) {
+  box.innerHTML = KEYS.map(([n, l]) => `<button class="key${'*#'.includes(n) ? ' sym' : ''}" data-k="${n}"><b>${n}</b><i>${l}</i></button>`).join('');
+  box.querySelectorAll('.key').forEach((b) => b.addEventListener('pointerdown', (e) => { e.preventDefault(); onPress(b.dataset.k, b); }));
+}
+function flash(btn) { btn.classList.add('on'); setTimeout(() => btn.classList.remove('on'), 120); }
+buildKeys($('keys'), (k, b) => { flash(b); tone(DTMF[k], 0.15, 0.08); if (/\d/.test(k) && S.dial.length < NUM_LEN) { S.dial += k; renderDial(); } });
+buildKeys($('dtmfKeys'), (k, b) => { flash(b); tone(DTMF[k], 0.18, 0.12, true); S.dtmf += k; $('dtmfNum').textContent = S.dtmf.slice(-16); });
+let delTimer = null;
+$('btnDel').addEventListener('pointerdown', () => { S.dial = S.dial.slice(0, -1); renderDial(); delTimer = setTimeout(() => { S.dial = ''; renderDial(); }, 700); });
+['pointerup', 'pointerleave'].forEach((ev) => $('btnDel').addEventListener(ev, () => clearTimeout(delTimer)));
+function renderDial() {
+  $('dialNum').textContent = fmtNum(S.dial);
+  $('dialNum').style.fontSize = S.dial.length > 9 ? '36px' : '40px';
+  $('btnDel').classList.toggle('show', S.dial.length > 0);
+  const r = S.dial.length === NUM_LEN && getRecents().find((x) => x.num === S.dial && x.name);
+  $('dialSub').textContent = r ? r.name : '';
+}
+document.addEventListener('keydown', (e) => {
+  if ($('vHome').classList.contains('hidden') || $('tabKeypad').classList.contains('hidden') || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (/^\d$/.test(e.key) && S.dial.length < NUM_LEN) { S.dial += e.key; tone(DTMF[e.key], 0.12, 0.08); renderDial(); }
+  else if (e.key === 'Backspace') { S.dial = S.dial.slice(0, -1); renderDial(); }
+  else if (e.key === 'Enter') $('btnDial').click();
+});
+$('myChip').onclick = () => {
+  if (!S.myId) return;
+  try { navigator.clipboard.writeText(fmtNum(S.myId)); toast('내 번호를 복사했습니다'); } catch (e) { toast(fmtNum(S.myId)); }
+};
+
+/* ================= 최근기록 ================= */
+function getRecents() { return store.get('recents', []); }
+function addRecent(r) { const list = getRecents(); list.unshift(r); store.set('recents', list.slice(0, 60)); }
+function renderRecents() {
+  const list = getRecents(), box = $('recentList');
+  if (!list.length) { box.innerHTML = '<div class="empty">통화 기록이 없습니다</div>'; return; }
+  const today = new Date().toDateString();
+  box.innerHTML = list.map((r, i) => {
+    const d = new Date(r.t);
+    const when = d.toDateString() === today ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : `${d.getMonth() + 1}/${d.getDate()}`;
+    const kind = { out: '발신', in: '수신', missed: '부재중', declined: '거절' }[r.dir];
+    const ic = { out: '↗', in: '↙', missed: '↙', declined: '↙' }[r.dir];
+    const detail = r.dur ? `${kind} · ${fmtDur(r.dur)}` : kind;
+    const badge = r.dur ? `<br><span class="badge l${r.level}">${r.level ? LEVEL_NAME[r.level] : '안전'}</span>` : '';
+    return `<button class="rec${r.dir === 'missed' ? ' missed' : ''}" data-i="${i}" style="width:100%;text-align:left">
+      <span class="ic">${ic}</span><span class="who"><b>${esc(r.name || fmtNum(r.num))}</b><small>${r.name ? fmtNum(r.num) + ' · ' : ''}${detail}</small></span>
+      <span class="when">${when}${badge}</span></button>`;
+  }).join('');
+  box.querySelectorAll('.rec').forEach((b) => (b.onclick = () => { S.dial = list[b.dataset.i].num; renderDial(); showTab('tabKeypad'); }));
+}
+$('btnClearRecents').onclick = () => { store.set('recents', []); renderRecents(); };
+
+/* ================= 설정 화면 ================= */
+function loadSettingsUI() {
+  $('setSuspect').value = cfg.suspect; $('setDanger').value = cfg.danger; $('setWindow').value = cfg.windowSec;
+  $('setModel').value = cfg.modelUrl; $('kwText').value = cfg.csv; $('setName').value = cfg.myName;
+  renderThemeChoice();
+}
+function renderThemeChoice() {
+  document.querySelectorAll('#themes .theme').forEach((b) => b.classList.toggle('on', b.dataset.theme === cfg.theme));
+  document.querySelectorAll('#mThemes .btn').forEach((b) => b.classList.toggle('blue', b.dataset.theme === S.viewTheme));
+  $('themeDesc').textContent = THEME_DESC[cfg.theme];
+}
+document.querySelectorAll('#themes .theme').forEach((b) => (b.onclick = () => {
+  cfg.theme = b.dataset.theme; store.set('theme', cfg.theme); setViewTheme(cfg.theme);
+}));
+document.querySelectorAll('#mThemes .btn').forEach((b) => (b.onclick = () => setViewTheme(b.dataset.theme)));
+function setViewTheme(t) {
+  S.viewTheme = t;
+  $('vCall').classList.remove('t-real', 't-caption', 't-analysis'); $('vCall').classList.add('t-' + t);
+  $('btnCaption').classList.toggle('on', t !== 'real');
+  renderThemeChoice();
+  const cl = $('capList'); cl.scrollTop = cl.scrollHeight;
+}
+$('btnCaption').onclick = () => setViewTheme(S.viewTheme === 'real' ? (cfg.theme === 'real' ? 'caption' : cfg.theme) : 'real');
+$('setName').onchange = () => { cfg.myName = $('setName').value.trim(); store.set('myName', cfg.myName); toast('이름을 저장했습니다'); };
+
+function buildDetector() {
+  const list = VG.parseCsv(cfg.csv);
+  S.detector = new VG.Detector(list, { suspect: cfg.suspect, danger: cfg.danger, windowSec: cfg.windowSec });
+  $('kwInfo').textContent = `키워드 ${list.length}개 적용됨 · 의심 ${cfg.suspect}점 / 위험 ${cfg.danger}점 / 최근 ${cfg.windowSec}초`;
+  $('mWindow').textContent = `최근 ${cfg.windowSec}초 동안 언급된 키워드로 판단합니다`;
+  renderRisk(S.detector.state());
+}
+$('btnApply').onclick = () => {
+  const s = Math.max(1, Number($('setSuspect').value) || DEFAULTS.suspect);
+  const d = Math.max(s, Number($('setDanger').value) || DEFAULTS.danger);
+  const w = Math.max(10, Number($('setWindow').value) || DEFAULTS.windowSec);
+  Object.assign(cfg, { suspect: s, danger: d, windowSec: w, csv: $('kwText').value });
+  ['suspect', 'danger', 'windowSec', 'csv'].forEach((k) => store.set(k, cfg[k]));
+  loadSettingsUI(); buildDetector(); S.alertLevel = 0; toast('탐지 설정을 적용했습니다');
+};
+$('btnReset').onclick = () => {
+  $('kwText').value = VG.SAMPLE_CSV; $('setSuspect').value = DEFAULTS.suspect;
+  $('setDanger').value = DEFAULTS.danger; $('setWindow').value = DEFAULTS.windowSec; $('btnApply').click();
+};
+$('csvInput').onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  $('kwText').value = VG.decodeText(await f.arrayBuffer()); e.target.value = '';
+  $('btnApply').click();
+};
+
+/* ================= 위험도 표시 ================= */
+function renderRisk(st) {
+  const pct = Math.min(100, (st.score / cfg.danger) * 100) + '%';
+  const color = st.level === 2 ? 'var(--red)' : st.level === 1 ? 'var(--orange)' : 'var(--green)';
+  const tick = Math.min(100, (cfg.suspect / cfg.danger) * 100) + '%';
+  const chips = st.counts.map((c) => `<span class="chip">${esc(c.word)} ×${c.count}</span>`).join('');
+  [['riskLevel', 'riskScore', 'gaugeFill', 'gaugeTick', 'riskChips'], ['mLevel', 'mScore', 'mFill', 'mTick', 'mChips']].forEach(([lv, sc, fl, tk, ch]) => {
+    $(lv).textContent = LEVEL_NAME[st.level]; $(lv).style.color = color;
+    $(sc).textContent = `${fmt(st.score)} / ${cfg.danger}점`;
+    $(fl).style.width = pct; $(fl).style.background = color; $(tk).style.left = tick;
+    $(ch).innerHTML = chips || '<span style="color:var(--sub);font-size:13px">아직 탐지된 키워드가 없습니다</span>';
+  });
+  $('riskPill').className = 'riskPill l' + st.level;
+  $('riskPillText').textContent = st.level ? `${LEVEL_NAME[st.level]} · ${fmt(st.score)}점` : '정상 · 탐지 작동 중';
+}
+function addCap(html, sys) {
+  const div = document.createElement('div');
+  div.className = 'cap' + (sys ? ' sys' : '');
+  div.innerHTML = html;
+  const box = $('capList');
+  box.appendChild(div);
+  while (box.children.length > 80) box.removeChild(box.firstChild);
+  box.scrollTop = box.scrollHeight;
+}
+function addLog(text) {
+  S.log.unshift(`${clock()} ${text}`);
+  $('mLog').innerHTML = S.log.length ? S.log.map((l) => `<div>${esc(l)}</div>`).join('') : '<div>아직 기록이 없습니다</div>';
+}
+
+/* ================= 인식 결과 처리 ================= */
+function onFinalText(text) {
+  text = text.trim(); if (!text) return;
+  const r = S.detector.feed(text);
+  addCap(`<small>${clock()}</small>${VG.highlight(text, r.matches, esc)}`);
+  if (r.matches.length) {
+    S.hitCount += r.matches.length;
+    addLog(`“${r.matches.map((m) => m.word).join(', ')}” 탐지 → ${fmt(r.score)}점`);
+  }
+  renderRisk(r);
+  if (r.level > S.alertLevel) showAlert(r);
+  S.alertLevel = r.level;
+  S.maxLevel = Math.max(S.maxLevel, r.level);
+}
+function resetSession() {
+  S.detector.reset(); S.alertLevel = 0; S.maxLevel = 0; S.hitCount = 0; S.log = [];
+  $('capList').innerHTML = ''; $('capPartial').textContent = ''; addLog('통화 시작');
+  renderRisk(S.detector.state());
+}
+
+/* ================= 경고 ================= */
+function showAlert(r) {
+  const box = $('alertBox');
+  box.className = 'alert lv' + r.level;
+  $('alertTitle').textContent = LEVEL_NAME[r.level];
+  $('alertMsg').textContent = r.level === 2
+    ? '보이스피싱에서 자주 쓰이는 말이 반복되고 있습니다. 돈을 보내거나 앱을 설치하거나 개인정보를 알려주지 마세요.'
+    : '보이스피싱에서 자주 쓰이는 말이 감지되었습니다. 상대방이 누구인지 주의 깊게 확인하세요.';
+  $('alertKw').innerHTML = r.counts.slice(0, 6).map((c) => `<span class="chip">${esc(c.word)} ×${c.count}</span>`).join('');
+  $('btnAlertHang').classList.toggle('hidden', !S.call && !S.solo);
+  if (navigator.vibrate) navigator.vibrate(r.level === 2 ? [400, 150, 400, 150, 800] : [300, 150, 300]);
+  beep(r.level === 2 ? 3 : 2, r.level === 2 ? 1046 : 784);
+  if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+    try { new Notification('보이스가드: ' + LEVEL_NAME[r.level], { body: r.counts.map((c) => c.word).join(', ') }); } catch (e) {}
+  }
+  addLog(`⚠️ ${LEVEL_NAME[r.level]} 경고`);
+}
+$('btnAlertOk').onclick = () => $('alertBox').classList.add('hidden');
+$('btnAlertHang').onclick = () => { $('alertBox').classList.add('hidden'); endCall('경고 화면에서 통화를 끊었습니다'); };
+
+/* ================= 시트 ================= */
+function openSheet(id) { closeSheets(); $('backdrop').classList.remove('hidden'); $(id).classList.remove('hidden'); }
+function closeSheets() { ['backdrop', 'sheetMore', 'sheetDemo'].forEach((i) => $(i).classList.add('hidden')); }
+$('backdrop').onclick = closeSheets;
+$('btnMore').onclick = () => { renderThemeChoice(); openSheet('sheetMore'); };
+$('riskPill').onclick = () => $('btnMore').click();
+$('btnDemo').onclick = () => openSheet('sheetDemo');
+$('btnKeypad').onclick = () => { S.dtmf = ''; $('dtmfNum').textContent = ''; $('dtmfPad').classList.remove('hidden'); };
+$('btnDtmfHide').onclick = () => $('dtmfPad').classList.add('hidden');
+
+/* ================= 음성인식 (Vosk, 온디바이스) ================= */
+function setModelStatus(text, cls, msg) {
+  $('modelText').textContent = text; $('modelDot').className = 'dot' + (cls ? ' ' + cls : '');
+  if (msg !== undefined) $('modelMsg').textContent = msg;
+  updateStatusDot();
+}
+function updateStatusDot() {
+  const bad = !S.netOk || S.modelState === 'error';
+  const ok = S.netOk && S.modelState === 'ready';
+  $('statusDot').className = 'dot' + (ok ? ' ok' : bad && S.myId ? ' bad' : '');
+}
+async function checkModelUrl(url) {
+  if (location.protocol === 'file:')
+    throw new Error('index.html을 파일로 직접 열었습니다. 터미널에서 python3 -m http.server 8080 을 실행한 뒤 http://localhost:8080 으로 여세요.');
+  let res;
+  try { res = await fetch(url, { cache: 'no-store' }); }
+  catch (e) { throw new Error('모델 파일 주소에 접속할 수 없습니다(주소 오타 또는 다른 사이트의 CORS 차단): ' + url); }
+  if (!res.ok) throw new Error(`모델 파일이 없습니다 (HTTP ${res.status}). models 폴더 안에 파일이 있는지, 파일 이름이 맞는지 확인하세요.`);
+  const type = res.headers.get('content-type') || '';
+  const reader = res.body.getReader();
+  let head = new Uint8Array(0);
+  while (head.length < 512) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    const n = new Uint8Array(head.length + value.length); n.set(head); n.set(value, head.length); head = n;
+  }
+  reader.cancel().catch(() => {});
+  if (type.includes('text/html') || head[0] === 0x3c)
+    throw new Error('모델 파일 대신 웹페이지(HTML)가 내려옵니다. 서버에 모델 파일이 올라가 있지 않습니다. (Cloudflare Pages는 25MB가 넘는 파일을 올릴 수 없습니다)');
+  const isGz = head[0] === 0x1f && head[1] === 0x8b;
+  const isTar = head.length >= 262 && String.fromCharCode(...head.slice(257, 262)) === 'ustar';
+  if (!isGz && !isTar) throw new Error('모델 파일 형식이 올바르지 않습니다. zip이 아니라 make_model.sh로 만든 .tar.gz 파일이어야 합니다.');
+  return Number(res.headers.get('content-length')) || 0;
+}
+function openModel(url) {   // vosk-browser의 createModel은 오류가 나면 영원히 기다리므로 직접 처리
+  return new Promise((resolve, reject) => {
+    const m = new Vosk.Model(url, 0);
+    S.model = m;
+    m.on('load', (msg) => (msg.result ? resolve(m) : reject(new Error('모델 초기화에 실패했습니다'))));
+    m.on('error', (msg) => reject(new Error(msg.error || '모델 압축 파일의 내용이 올바르지 않습니다. make_model.sh로 다시 만들어 보세요.')));
+  });
+}
+function clearModelCache() {   // 실패한 다운로드가 저장돼 계속 실패하는 것을 막음
+  if (S.model) { try { S.model.terminate(); } catch (e) {} S.model = null; }
+  return new Promise((resolve) => {
+    try { const req = indexedDB.deleteDatabase('/vosk'); req.onsuccess = req.onerror = req.onblocked = () => resolve(); } catch (e) { resolve(); }
+    setTimeout(resolve, 3000);
+  });
+}
+async function loadModel() {
+  if (S.model) { try { S.model.terminate(); } catch (e) {} S.model = null; }
+  S.modelState = 'loading';
+  const t0 = Date.now();
+  setModelStatus('모델 확인 중…', '', '');
+  const tick = setInterval(() => {
+    const s = Math.round((Date.now() - t0) / 1000);
+    setModelStatus(`불러오는 중… ${s}초`, '');
+    if (s === 180) $('modelMsg').textContent = '처음 한 번은 몇 분 걸릴 수 있습니다. 계속 멈춰 있으면 "캐시 지우고 다시 받기"를 누르세요.';
+  }, 1000);
+  try {
+    const url = new URL(cfg.modelUrl, location.href).href;
+    const size = await checkModelUrl(url);
+    if (size) $('modelMsg').textContent = `모델 파일 확인됨 (${(size / 1048576).toFixed(0)}MB). 처음에는 내려받아 압축을 푸느라 1~3분 걸립니다.`;
+    await openModel(url);
+    S.modelState = 'ready';
+    setModelStatus('음성인식 준비됨', 'ok', `준비 완료 (${Math.round((Date.now() - t0) / 1000)}초). 다음부터는 저장된 모델을 바로 씁니다.`);
+    toast('음성인식 준비 완료');
+    if (S.remoteStream && !S.recog) startRecognition(S.remoteStream);
+    else if (S.solo && !S.recog) startRecognition(S.mic);
+  } catch (e) {
+    console.error(e);
+    S.modelState = 'error';
+    setModelStatus('음성인식 모델 오류', 'bad', '오류: ' + (e.message || e));
+    toast('음성인식 모델 오류 · 설정에서 확인하세요');
+    await clearModelCache();
+  } finally { clearInterval(tick); }
+}
+$('btnModelReload').onclick = () => { cfg.modelUrl = $('setModel').value.trim() || DEFAULTS.modelUrl; store.set('modelUrl', cfg.modelUrl); loadModel(); };
+$('btnModelClear').onclick = async () => {
+  cfg.modelUrl = $('setModel').value.trim() || DEFAULTS.modelUrl; store.set('modelUrl', cfg.modelUrl);
+  setModelStatus('저장된 모델 지우는 중…', ''); await clearModelCache(); loadModel();
+};
+
+function startRecognition(stream) {
+  stopRecognition();
+  if (S.modelState !== 'ready') {
+    addCap(S.modelState === 'loading' ? '음성인식 모델을 불러오는 중입니다. 준비되면 자동으로 자막이 시작됩니다.' : '음성인식 모델이 없어 자막 없이 통화만 됩니다. (설정 → 음성인식 모델 확인)', true);
+    return;
+  }
+  const rec = new S.model.KaldiRecognizer(S.ctx.sampleRate);
+  rec.on('result', (m) => { $('capPartial').textContent = ''; onFinalText(m.result.text || ''); });
+  rec.on('partialresult', (m) => { $('capPartial').textContent = m.result.partial || ''; });
+  const src = S.ctx.createMediaStreamSource(stream);
+  const proc = S.ctx.createScriptProcessor(4096, 1, 1);
+  const sink = S.ctx.createGain(); sink.gain.value = 0;
+  proc.onaudioprocess = (ev) => {
+    const buf = ev.inputBuffer;
+    try { rec.acceptWaveform(buf); } catch (e) {}
+    const d = buf.getChannelData(0); let sum = 0;
+    for (let i = 0; i < d.length; i += 16) sum += d[i] * d[i];
+    $('meter').style.width = Math.min(100, Math.sqrt(sum / (d.length / 16)) * 400) + '%';
+  };
+  src.connect(proc); proc.connect(sink); sink.connect(S.ctx.destination);
+  S.recog = { rec, src, proc, sink };
+}
+function stopRecognition() {
+  if (!S.recog) return;
+  const { rec, src, proc, sink } = S.recog;
+  try { rec.retrieveFinalResult(); } catch (e) {}
+  setTimeout(() => { try { rec.remove(); } catch (e) {} }, 800);
+  proc.onaudioprocess = null;
+  try { src.disconnect(); proc.disconnect(); sink.disconnect(); } catch (e) {}
+  S.recog = null; $('meter').style.width = '0';
+}
+
+/* ================= 오디오 송출 경로 ================= */
+async function setupAudio() {
+  S.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  S.mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  S.outDest = S.ctx.createMediaStreamDestination();
+  S.micGain = S.ctx.createGain();
+  S.ctx.createMediaStreamSource(S.mic).connect(S.micGain).connect(S.outDest);
+  S.fileEl = new Audio();
+  const fileSrc = S.ctx.createMediaElementSource(S.fileEl);
+  const monitor = S.ctx.createGain(); monitor.gain.value = 0.35;
+  fileSrc.connect(S.outDest); fileSrc.connect(monitor).connect(S.ctx.destination);
+  S.fileEl.onended = () => { $('btnFilePlay').textContent = '▶ 송출 시작'; setMuted(false); };
+  // 모바일 브라우저에서 벨소리가 나중에 울릴 수 있도록 미리 한 번 재생 허락 받기
+  const ring = $('ringAudio'); ring.muted = true;
+  ring.play().then(() => { ring.pause(); ring.currentTime = 0; ring.muted = false; }).catch(() => { ring.muted = false; });
+}
+function setMuted(m) {
+  S.muted = m; S.micGain.gain.value = m ? 0 : 1;
+  $('btnMute').classList.toggle('on', m);
+  $('btnMute').querySelector('path').setAttribute('d', m ? MIC_OFF : MIC_ON);
+}
+$('btnMute').onclick = () => setMuted(!S.muted);
+$('fileInput').onchange = (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  if (S.fileUrl) URL.revokeObjectURL(S.fileUrl);
+  S.fileUrl = URL.createObjectURL(f); S.fileEl.src = S.fileUrl;
+  $('demoName').textContent = '선택됨: ' + f.name;
+  $('btnFilePlay').disabled = false; $('btnFileStop').disabled = false;
+};
+$('btnFilePlay').onclick = () => {
+  if (S.fileEl.paused) { S.fileEl.play(); setMuted(true); $('btnFilePlay').textContent = '⏸ 일시정지'; toast('시연 음성을 보내는 중'); }
+  else { S.fileEl.pause(); $('btnFilePlay').textContent = '▶ 송출 시작'; }
+};
+$('btnFileStop').onclick = () => { S.fileEl.pause(); S.fileEl.currentTime = 0; $('btnFilePlay').textContent = '▶ 송출 시작'; setMuted(false); };
+
+/* ================= 통화 (PeerJS / WebRTC) ================= */
+function newNumber() { return '010' + String(Math.floor(Math.random() * 1e8)).padStart(8, '0'); }
+function savedNumber() {
+  let n = null;
+  try { n = sessionStorage.getItem('vg_myId'); } catch (e) {}
+  return n || store.get('myId', null);
+}
+function initPeer(num) {
+  S.myId = num; S.netOk = false;
+  $('myNumTxt').textContent = '연결 중…'; updateStatusDot();
+  // 기본은 PeerJS 무료 공개 서버. 직접 띄운 서버는 주소 뒤에 ?peer=호스트:포트
+  const custom = new URLSearchParams(location.search).get('peer');
+  const opts = { debug: 1 };
+  if (custom) { const [host, port] = custom.split(':'); Object.assign(opts, { host, port: Number(port) || 443, path: '/', secure: location.protocol === 'https:' }); }
+  const peer = new Peer(ID_PREFIX + num, opts);
+  S.peer = peer;
+  peer.on('open', () => {
+    try { sessionStorage.setItem('vg_myId', num); } catch (e) {}
+    store.set('myId', num);
+    S.netOk = true;
+    $('myNumTxt').textContent = '내 번호 ' + fmtNum(num); $('setMyNum').textContent = fmtNum(num);
+    updateStatusDot();
+  });
+  peer.on('call', onIncoming);
+  peer.on('connection', (c) => c.on('data', (d) => handleSignal(c.peer, d)));
+  peer.on('disconnected', () => { S.netOk = false; updateStatusDot(); setTimeout(() => { if (!peer.destroyed) peer.reconnect(); }, 1500); });
+  peer.on('error', (err) => {
+    console.warn(err);
+    if (err.type === 'unavailable-id') { peer.destroy(); initPeer(newNumber()); return; }
+    if (err.type === 'peer-unavailable') { endCall('없는 번호입니다', true); return; }
+    if (['network', 'server-error', 'socket-error'].includes(err.type)) { S.netOk = false; $('myNumTxt').textContent = '서버 연결 실패'; updateStatusDot(); }
+  });
+}
+
+$('btnDial').onclick = () => {
+  const num = S.dial;
+  if (!num) { const last = getRecents().find((r) => r.dir === 'out'); if (last) { S.dial = last.num; renderDial(); } return; }
+  if (num.length !== NUM_LEN) { toast('번호 11자리를 입력하세요'); return; }
+  if (num === S.myId) { toast('내 번호로는 걸 수 없습니다'); return; }
+  if (!S.peer || !S.peer.open) { toast('아직 서버에 연결되지 않았습니다'); return; }
+  S.ctx.resume();
+  const call = S.peer.call(ID_PREFIX + num, S.outDest.stream, { metadata: { name: cfg.myName } });
+  if (!call) { toast('전화를 걸 수 없습니다'); return; }
+  const r = getRecents().find((x) => x.num === num && x.name);
+  enterCall(call, { num, name: r ? r.name : '', dir: 'out' });
+  $('callSub').textContent = '발신 중…';
+  ringbackStart();
+};
+
+// 거절·취소는 WebRTC 통화만으로는 상대에게 전달이 안 돼서 짧은 데이터 메시지로 알림
+function signal(num, msg) {
+  try {
+    const c = S.peer.connect(ID_PREFIX + num, { reliable: true });
+    c.on('open', () => { c.send(msg); setTimeout(() => c.close(), 1500); });
+  } catch (e) {}
+}
+function handleSignal(from, d) {
+  const num = String(from).replace(ID_PREFIX, '');
+  if (!d || typeof d !== 'object') return;
+  if (d.type === 'reject' && S.call && S.info && S.info.num === num && !S.connected) endCall(d.reason || '상대방이 받을 수 없습니다');
+  if (d.type === 'cancel' && S.pendingCall && S.pendingInfo && S.pendingInfo.num === num) {
+    const call = S.pendingCall;
+    addRecent({ ...S.pendingInfo, dir: 'missed', t: Date.now() }); closeIncoming();
+    try { call.close(); } catch (e) {}
+  }
+}
+function onIncoming(call) {
+  if (S.call || S.pendingCall || S.solo) { signal(call.peer.replace(ID_PREFIX, ''), { type: 'reject', reason: '상대방이 통화 중입니다' }); setTimeout(() => call.close(), 500); return; }
+  const info = { num: call.peer.replace(ID_PREFIX, ''), name: (call.metadata && call.metadata.name) || '', dir: 'in' };
+  S.pendingCall = call; S.pendingInfo = info;
+  $('inName').textContent = info.name || fmtNum(info.num);
+  $('inSub').textContent = info.name ? fmtNum(info.num) : '';
+  showView('vIncoming');
+  ringStart();
+  if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+    try { new Notification('전화 수신', { body: info.name || fmtNum(info.num) }); } catch (e) {}
+  }
+  call.on('close', () => {
+    if (S.pendingCall === call) { addRecent({ ...info, dir: 'missed', t: Date.now() }); closeIncoming(); }
+  });
+}
+function closeIncoming() { S.pendingCall = null; S.pendingInfo = null; ringStop(); showView('vHome'); }
+$('btnAnswer').onclick = () => {
+  const call = S.pendingCall, info = S.pendingInfo; if (!call) return;
+  S.pendingCall = null; S.pendingInfo = null; ringStop();
+  S.ctx.resume();
+  call.answer(S.outDest.stream);
+  enterCall(call, info);
+  $('callSub').textContent = '연결 중…';
+};
+function rejectIncoming() {
+  const call = S.pendingCall, info = S.pendingInfo;
+  if (info) { addRecent({ ...info, dir: 'declined', t: Date.now() }); signal(info.num, { type: 'reject', reason: '상대방이 전화를 받을 수 없습니다' }); }
+  closeIncoming(); if (call) setTimeout(() => call.close(), 300);
+}
+$('btnReject').onclick = rejectIncoming;
+$('btnInMsg').onclick = rejectIncoming;
+$('btnInLater').onclick = () => { rejectIncoming(); toast('나중에 다시 걸어 보세요'); };
+
+function enterCall(call, info) {
+  S.call = call; S.info = info; S.connected = false; S.ending = false;
+  prepareCallScreen(info.name || fmtNum(info.num), info.name ? fmtNum(info.num) : '');
+  call.on('stream', onRemoteStream);
+  call.on('close', () => endCall('통화 종료'));
+  call.on('error', () => endCall('통화 오류'));
+  setTimeout(() => { if (S.call === call && !S.connected) endCall('응답 없음'); }, 40000);
+}
+function prepareCallScreen(name, sub) {
+  resetSession(); setViewTheme(cfg.theme); setMuted(false);
+  $('callName').textContent = name; $('callSub').textContent = sub; $('callLabel').textContent = '휴대전화';
+  $('dtmfPad').classList.add('hidden'); $('alertBox').classList.add('hidden');
+  $('btnDemo').disabled = !!S.solo;
+  showView('vCall');
+}
+function startTimer() {
+  S.callStart = Date.now(); clearInterval(S.timerId);
+  const upd = () => { const s = Math.floor((Date.now() - S.callStart) / 1000); $('callLabel').textContent = `휴대전화 · ${pad(Math.floor(s / 60))}:${pad(s % 60)}`; };
+  upd(); S.timerId = setInterval(upd, 1000);
+}
+function onRemoteStream(stream) {
+  if (S.remoteStream === stream) return;   // PeerJS가 stream 이벤트를 두 번 보내는 경우 대비
+  S.remoteStream = stream; S.connected = true;
+  ringbackStop();
+  const a = $('remoteAudio'); a.srcObject = stream; a.play().catch(() => {});
+  $('callSub').textContent = S.info.name ? fmtNum(S.info.num) : '';
+  startTimer();
+  const pc = S.call && S.call.peerConnection;
+  if (pc) pc.addEventListener('iceconnectionstatechange', () => {
+    if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed') endCall('연결 끊김');
+    if (pc.iceConnectionState === 'disconnected') setTimeout(() => { if (pc.iceConnectionState === 'disconnected') endCall('연결 끊김'); }, 4000);
+  });
+  addCap('통화가 연결되었습니다. 상대방 말이 여기에 자막으로 나옵니다.', true);
+  startRecognition(stream);
+}
+function endCall(reason, silentNoCall) {
+  if (S.solo) { stopSolo(); return; }
+  const call = S.call;
+  if (!call || S.ending) return;
+  S.ending = true; S.call = null;
+  if (!S.connected && S.info.dir === 'out') signal(S.info.num, { type: 'cancel' });   // 받기 전에 끊으면 상대 벨소리 멈춤
+  try { call.close(); } catch (e) {}
+  stopRecognition(); ringbackStop(); clearInterval(S.timerId);
+  $('remoteAudio').srcObject = null;
+  const dur = S.connected ? Math.max(1, Math.round((Date.now() - S.callStart) / 1000)) : 0;
+  addRecent({ num: S.info.num, name: S.info.name, dir: S.info.dir, t: Date.now(), dur, level: S.maxLevel, hits: S.hitCount });
+  S.remoteStream = null; S.connected = false;
+  if (S.fileEl && !S.fileEl.paused) $('btnFileStop').click();
+  closeSheets(); $('dtmfPad').classList.add('hidden');
+  $('callLabel').textContent = reason || '통화 종료';
+  if (silentNoCall) $('callSub').textContent = '';
+  if (S.maxLevel) toast(`이 통화는 '${LEVEL_NAME[S.maxLevel]}'으로 기록되었습니다`);
+  setTimeout(() => { S.ending = false; if (!S.call) { showView('vHome'); showTab('tabKeypad'); } }, 1300);
+}
+$('btnHang').onclick = () => endCall('통화 종료');
+
+/* 혼자 테스트: 통화 화면에서 내 마이크로 인식 */
+$('btnSolo').onclick = () => {
+  if (S.call) return;
+  S.solo = true; S.info = { num: '', name: '혼자 테스트' };
+  prepareCallScreen('혼자 테스트', '내 마이크 소리를 인식합니다');
+  startTimer();
+  addCap('마이크에 대고 말해 보세요. 예: "검찰청 수사관인데 안전계좌로 이체하세요"', true);
+  startRecognition(S.mic);
+};
+function stopSolo() {
+  S.solo = false; stopRecognition(); clearInterval(S.timerId);
+  closeSheets(); showView('vHome'); showTab('tabSettings');
+}
+
+/* ================= 시작 ================= */
+$('btnStart').onclick = async () => {
+  $('btnStart').disabled = true; $('btnStart').textContent = '준비 중…';
+  try { await setupAudio(); }
+  catch (e) {
+    console.error(e);
+    $('btnStart').disabled = false; $('btnStart').textContent = '시작하기';
+    alert('마이크를 사용할 수 없습니다. 마이크 권한을 허용했는지, 주소가 https:// 또는 localhost인지 확인하세요.');
+    return;
+  }
+  if ('Notification' in window && Notification.permission === 'default') { try { Notification.requestPermission(); } catch (e) {} }
+  showView('vHome'); showTab('tabKeypad');
+  initPeer(savedNumber() || newNumber());
+  setInterval(() => {   // 판단 구간이 지난 키워드는 점수에서 빠짐
+    const st = S.detector.state(); renderRisk(st);
+    if (st.level < S.alertLevel) S.alertLevel = st.level;
+  }, 1000);
+  loadModel();
+};
+
+loadSettingsUI();
+buildDetector();
+renderDial();
+</script>
+</body>
+</html>
